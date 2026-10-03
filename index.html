@@ -1,0 +1,1060 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Холст — рисуй в браузере</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23e07a5f'/%3E%3Cpath d='M8 21c3-8 6 2 9-5s5-3 7-1' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+  :root {
+    color-scheme: light dark;
+    --accent: #e07a5f;
+    --accent-strong: #d0664a;
+    --accent-soft: rgba(224, 122, 95, .14);
+    --panel: #fbf8f3;
+    --line: #ece4d8;
+    --text: #3d3530;
+    --muted: #8f847a;
+    --btn: #ffffff;
+    --btn-hover: #f5efe6;
+    --shadow: 0 1px 2px rgba(70, 45, 30, .06), 0 3px 12px rgba(70, 45, 30, .07);
+    --radius: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --accent-soft: rgba(224, 122, 95, .22);
+      --panel: #23201d;
+      --line: #36312c;
+      --text: #efe7dd;
+      --muted: #a2978c;
+      --btn: #2e2a26;
+      --btn-hover: #38332e;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 3px 12px rgba(0, 0, 0, .3);
+    }
+  }
+
+  [hidden] { display: none !important; }
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  body {
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    font-family: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    background: var(--panel);
+    color: var(--text);
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+  button, input { font: inherit; color: inherit; }
+  button { touch-action: manipulation; }
+
+  /* ---------- Панель ---------- */
+  .panel {
+    width: 224px;
+    flex: none;
+    padding: 18px 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow-y: auto;
+    border-right: 1px solid var(--line);
+    background: var(--panel);
+    z-index: 2;
+    scrollbar-width: thin;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800;
+    font-size: 21px;
+    letter-spacing: .2px;
+    padding: 0 2px;
+  }
+  .brand svg { width: 32px; height: 32px; flex: none; }
+  .sec { display: flex; flex-direction: column; gap: 8px; }
+  .label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 11.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .7px;
+    color: var(--muted);
+    padding: 0 2px;
+  }
+  .label span { text-transform: none; letter-spacing: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+  .tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .tool {
+    height: 44px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--btn);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s, transform .1s;
+  }
+  .tool:hover { background: var(--btn-hover); }
+  .tool:active { transform: scale(.96); }
+  .tool.active { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(224, 122, 95, .35); }
+
+  .palette { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; }
+  .sw {
+    aspect-ratio: 1;
+    width: 100%;
+    border-radius: 50%;
+    border: 1px solid rgba(0, 0, 0, .12);
+    padding: 0;
+    cursor: pointer;
+    transition: transform .12s;
+  }
+  .sw:hover { transform: scale(1.1); }
+  .sw.active, .custom.active .custom-sw { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent); }
+
+  .custom {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 5px 8px 5px 5px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--btn);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .custom:hover { background: var(--btn-hover); }
+  .custom-sw {
+    width: 24px; height: 24px; border-radius: 50%; flex: none;
+    background: conic-gradient(#e63946, #f6c945, #52b788, #3d7cc9, #7b5ea7, #e63946);
+    border: 1px solid rgba(0, 0, 0, .12);
+  }
+  .custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+
+  .size-row { display: flex; align-items: center; gap: 10px; }
+  .size-row input { flex: 1; min-width: 0; }
+  .preview {
+    width: 54px; height: 54px; flex: none;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: var(--btn);
+    display: grid; place-items: center;
+    overflow: hidden;
+  }
+  .preview-dot { border-radius: 50%; }
+  input[type=range] { accent-color: var(--accent); height: 22px; margin: 0; cursor: pointer; }
+
+  .bgs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .bg {
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+    padding: 7px 2px 6px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--btn);
+    font-size: 12.5px; font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .bg:hover { background: var(--btn-hover); }
+  .bg i { width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, .15); }
+  .bg.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
+  @media (prefers-color-scheme: dark) { .bg.active { color: #f0a58f; } }
+
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .act {
+    height: 40px;
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--btn);
+    font-size: 14px; font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .15s, opacity .15s, transform .1s;
+  }
+  .act .icon { width: 18px; height: 18px; }
+  .act:hover:not(:disabled) { background: var(--btn-hover); }
+  .act:active:not(:disabled) { transform: scale(.97); }
+  .act:disabled { opacity: .4; cursor: default; }
+  .act.wide { grid-column: span 2; }
+  .act.primary { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(224, 122, 95, .3); }
+  .act.primary:hover:not(:disabled) { background: var(--accent-strong); }
+
+  .hint { margin-top: auto; font-size: 12.5px; line-height: 1.7; color: var(--muted); padding: 0 2px; }
+  kbd {
+    font: inherit; font-size: 11.5px; font-weight: 700;
+    padding: 0 5px; border-radius: 5px;
+    border: 1px solid var(--line); border-bottom-width: 2px;
+    background: var(--btn); color: var(--text);
+  }
+
+  /* ---------- Холст ---------- */
+  .stage {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+    touch-action: none;
+    background: #ffffff;
+    transition: background-color .2s;
+  }
+  .stage canvas { position: absolute; left: 0; top: 0; touch-action: none; }
+  #overlay { cursor: none; }
+  #overlay.fill-cursor { cursor: crosshair; }
+  .ring {
+    position: absolute; left: 0; top: 0;
+    border-radius: 50%;
+    pointer-events: none;
+    border: 1px solid rgba(0, 0, 0, .7);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, .85), inset 0 0 0 1px rgba(255, 255, 255, .5);
+    will-change: transform;
+  }
+  .ring::after {
+    content: ''; position: absolute; left: 50%; top: 50%;
+    width: 2px; height: 2px; margin: -1px 0 0 -1px; border-radius: 50%;
+    background: rgba(0, 0, 0, .7); box-shadow: 0 0 0 1px rgba(255, 255, 255, .8);
+  }
+
+  /* ---------- Диалог и тост ---------- */
+  .modal {
+    position: fixed; inset: 0; z-index: 10;
+    display: grid; place-items: center;
+    background: rgba(30, 22, 16, .35);
+    backdrop-filter: blur(2px);
+    padding: 16px;
+    animation: fade .15s ease-out;
+  }
+  .modal-card {
+    width: min(340px, 100%);
+    background: var(--panel);
+    border-radius: 18px;
+    padding: 22px 22px 18px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, .25);
+    animation: pop .18s ease-out;
+  }
+  .modal-card h2 { margin: 0 0 6px; font-size: 19px; font-weight: 800; }
+  .modal-card p { margin: 0 0 18px; color: var(--muted); font-size: 14.5px; line-height: 1.45; }
+  .modal-row { display: flex; gap: 8px; justify-content: flex-end; }
+  .modal-row .act { padding: 0 18px; }
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; z-index: 11;
+    transform: translate(-50%, 20px);
+    opacity: 0;
+    background: #2f2a25; color: #fff;
+    padding: 9px 16px; border-radius: 999px;
+    font-size: 14px; font-weight: 700;
+    pointer-events: none;
+    transition: opacity .2s, transform .2s;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  @keyframes fade { from { opacity: 0; } }
+  @keyframes pop { from { transform: scale(.95); opacity: 0; } }
+
+  /* ---------- Телефон ---------- */
+  @media (max-width: 720px) {
+    body { flex-direction: column; }
+    .stage { order: 0; }
+    .panel {
+      order: 1;
+      width: auto;
+      flex-direction: row;
+      align-items: stretch;
+      gap: 18px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      border-right: 0;
+      border-top: 1px solid var(--line);
+      padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+      touch-action: pan-x;
+      -webkit-overflow-scrolling: touch;
+    }
+    .brand, .hint { display: none; }
+    .sec { flex: none; gap: 6px; }
+    .label { font-size: 10.5px; }
+    .tools { grid-template-columns: repeat(3, 40px); gap: 5px; }
+    .tool { height: 40px; }
+    .palette { grid-template-columns: repeat(6, 24px); gap: 6px; }
+    .colors { display: flex; gap: 8px; align-items: center; }
+    .custom { padding: 0; border: 0; background: none; }
+    .custom-text { display: none; }
+    .custom-sw { width: 30px; height: 30px; }
+    .sec-size, .sec-opacity { width: 150px; }
+    .preview { width: 44px; height: 44px; }
+    .bgs { grid-template-columns: repeat(3, 62px); }
+    .actions { display: flex; gap: 5px; }
+    .act { width: 42px; height: 42px; padding: 0; }
+    .act span { display: none; }
+    .act.wide { grid-column: auto; }
+    .act .icon { width: 20px; height: 20px; }
+  }
+  @media (min-width: 721px) {
+    .colors { display: flex; flex-direction: column; gap: 10px; }
+  }
+  @media (max-height: 640px) and (min-width: 721px) {
+    .brand { font-size: 18px; }
+    .panel { gap: 12px; padding-top: 12px; }
+    .hint { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<aside class="panel" id="panel" aria-label="Панель инструментов">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9" fill="#e07a5f"/><path d="M8 21c3-8 6 2 9-5s5-3 7-1" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round"/></svg>
+    <span>Холст</span>
+  </div>
+
+  <section class="sec">
+    <div class="label">Инструменты</div>
+    <div class="tools" role="toolbar">
+      <button class="tool active" data-tool="brush" title="Кисть (B)" aria-label="Кисть">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M9.06 11.9 17.1 3.86a2.06 2.06 0 0 1 2.92 2.92l-8.05 8.04"/><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"/></svg>
+      </button>
+      <button class="tool" data-tool="eraser" title="Ластик (E)" aria-label="Ластик">
+        <svg class="icon" viewBox="0 0 24 24"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
+      </button>
+      <button class="tool" data-tool="fill" title="Заливка (G)" aria-label="Заливка">
+        <svg class="icon" viewBox="0 0 24 24"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"/></svg>
+      </button>
+      <button class="tool" data-tool="line" title="Линия (L)" aria-label="Линия">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M5 19 19 5"/></svg>
+      </button>
+      <button class="tool" data-tool="rect" title="Прямоугольник (R)" aria-label="Прямоугольник">
+        <svg class="icon" viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="13" rx="1.5"/></svg>
+      </button>
+      <button class="tool" data-tool="ellipse" title="Круг (O)" aria-label="Круг">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="label">Цвет</div>
+    <div class="colors">
+      <div class="palette" id="palette"></div>
+      <label class="custom" id="custom" title="Свой цвет">
+        <span class="custom-sw" id="customSw"></span>
+        <span class="custom-text">Свой цвет</span>
+        <input type="color" id="customColor" value="#3d7cc9" aria-label="Свой цвет">
+      </label>
+    </div>
+  </section>
+
+  <section class="sec sec-size">
+    <div class="label">Размер <span id="sizeVal">6 px</span></div>
+    <div class="size-row">
+      <input type="range" id="size" min="1" max="50" value="6" aria-label="Толщина кисти">
+      <div class="preview"><div class="preview-dot" id="previewDot"></div></div>
+    </div>
+  </section>
+
+  <section class="sec sec-opacity">
+    <div class="label">Прозрачность <span id="opacityVal">100%</span></div>
+    <input type="range" id="opacity" min="10" max="100" value="100" aria-label="Прозрачность">
+  </section>
+
+  <section class="sec">
+    <div class="label">Фон</div>
+    <div class="bgs">
+      <button class="bg active" data-bg="white"><i style="background:#ffffff"></i>Белый</button>
+      <button class="bg" data-bg="paper"><i style="background:#f5eedc"></i>Бумага</button>
+      <button class="bg" data-bg="black"><i style="background:#141414"></i>Чёрный</button>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="label">Действия</div>
+    <div class="actions">
+      <button class="act" id="undo" title="Назад (Ctrl+Z)" aria-label="Назад" disabled>
+        <svg class="icon" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg><span>Назад</span>
+      </button>
+      <button class="act" id="redo" title="Вперёд (Ctrl+Shift+Z)" aria-label="Вперёд" disabled>
+        <svg class="icon" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg><span>Вперёд</span>
+      </button>
+      <button class="act wide" id="clear" title="Очистить холст" aria-label="Очистить">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg><span>Очистить</span>
+      </button>
+      <button class="act wide primary" id="save" title="Сохранить PNG (Ctrl+S)" aria-label="Сохранить PNG">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg><span>Сохранить PNG</span>
+      </button>
+    </div>
+  </section>
+
+  <div class="hint">
+    <kbd>Shift</kbd> — ровные фигуры<br>
+    <kbd>[</kbd> <kbd>]</kbd> — размер кисти
+  </div>
+</aside>
+
+<main class="stage" id="stage">
+  <canvas id="main"></canvas>
+  <canvas id="overlay"></canvas>
+  <div class="ring" id="ring" hidden></div>
+</main>
+
+<div class="modal" id="confirm" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <h2 id="confirmTitle">Очистить холст?</h2>
+    <p>Весь рисунок будет стёрт. Если передумаете — нажмите «Назад» или Ctrl+Z.</p>
+    <div class="modal-row">
+      <button class="act" id="confirmNo">Отмена</button>
+      <button class="act primary" id="confirmYes">Очистить</button>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Константы ----------
+  const PALETTE = [
+    ['Чернила', '#2f2a25'], ['Белый', '#ffffff'], ['Серый', '#9a948d'],
+    ['Красный', '#e63946'], ['Оранжевый', '#f4a261'], ['Жёлтый', '#f6c945'],
+    ['Зелёный', '#52b788'], ['Бирюзовый', '#2a9d8f'], ['Синий', '#3d7cc9'],
+    ['Фиолетовый', '#7b5ea7'], ['Розовый', '#ff8fab'], ['Коричневый', '#8d5a3b'],
+  ];
+  const INK = '#2f2a25';
+  const BACKGROUNDS = { white: '#ffffff', paper: '#f5eedc', black: '#141414' };
+  const HISTORY_LIMIT = 50;
+  const FILL_TOLERANCE = 48;
+  const MAX_SIDE = 8192;
+  const MAX_PIXELS = 16e6;
+
+  const $ = (s) => document.querySelector(s);
+  const stage = $('#stage');
+  const main = $('#main');
+  const overlay = $('#overlay');
+  const ring = $('#ring');
+  const mctx = main.getContext('2d');
+  const octx = overlay.getContext('2d');
+  // Скрытая копия: состояние «до» для истории и источник для ластика
+  const snap = document.createElement('canvas');
+  const sctx = snap.getContext('2d', { willReadFrequently: true });
+
+  const state = { tool: 'brush', color: INK, size: 6, opacity: 1, bg: 'white' };
+  const undoStack = [];
+  const redoStack = [];
+  let drawing = null;
+  let pendingResize = false;
+
+  // ---------- Плотность пикселей (с ограничением по памяти) ----------
+  const SCALE = (() => {
+    let s = Math.min(window.devicePixelRatio || 1, 3);
+    const w = Math.max(screen.width || 0, innerWidth);
+    const h = Math.max(screen.height || 0, innerHeight);
+    if (w * h * s * s > MAX_PIXELS) s = Math.max(1, Math.sqrt(MAX_PIXELS / (w * h)));
+    return s;
+  })();
+
+  // Холст только растёт — рисунок никогда не обрезается
+  function ensureSize() {
+    if (drawing) { pendingResize = true; return; }
+    const w = Math.min(MAX_SIDE, Math.ceil(stage.clientWidth * SCALE));
+    const h = Math.min(MAX_SIDE, Math.ceil(stage.clientHeight * SCALE));
+    if (w <= main.width && h <= main.height) return;
+    const W = Math.max(w, main.width);
+    const H = Math.max(h, main.height);
+    let copy = null;
+    if (main.width && main.height) {
+      copy = document.createElement('canvas');
+      copy.width = main.width; copy.height = main.height;
+      copy.getContext('2d').drawImage(main, 0, 0);
+    }
+    for (const c of [main, snap, overlay]) { c.width = W; c.height = H; }
+    if (copy) { mctx.drawImage(copy, 0, 0); sctx.drawImage(copy, 0, 0); }
+    for (const c of [main, overlay]) {
+      c.style.width = W / SCALE + 'px';
+      c.style.height = H / SCALE + 'px';
+    }
+  }
+
+  // ---------- Прямоугольники ----------
+  const box = (x0, y0, x1, y1) => ({ x0, y0, x1, y1 });
+  const union = (a, b) => a ? box(Math.min(a.x0, b.x0), Math.min(a.y0, b.y0), Math.max(a.x1, b.x1), Math.max(a.y1, b.y1)) : b;
+  function toRect(b) {
+    if (!b) return null;
+    const x = Math.max(0, Math.floor(b.x0)), y = Math.max(0, Math.floor(b.y0));
+    const x1 = Math.min(main.width, Math.ceil(b.x1)), y1 = Math.min(main.height, Math.ceil(b.y1));
+    return x1 > x && y1 > y ? { x, y, w: x1 - x, h: y1 - y } : null;
+  }
+
+  // ---------- История: храним только изменённый прямоугольник ----------
+  function record(r) {
+    const before = sctx.getImageData(r.x, r.y, r.w, r.h);
+    const after = mctx.getImageData(r.x, r.y, r.w, r.h);
+    syncSnap(r);
+    undoStack.push({ r, before, after });
+    if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+    redoStack.length = 0;
+    updateHistoryButtons();
+  }
+  function syncSnap(r) {
+    sctx.clearRect(r.x, r.y, r.w, r.h);
+    sctx.drawImage(main, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
+  }
+  function applyEntry(entry, data) {
+    mctx.putImageData(data, entry.r.x, entry.r.y);
+    sctx.putImageData(data, entry.r.x, entry.r.y);
+  }
+  function undo() {
+    if (drawing || !undoStack.length) return;
+    const e = undoStack.pop();
+    applyEntry(e, e.before);
+    redoStack.push(e);
+    updateHistoryButtons();
+  }
+  function redo() {
+    if (drawing || !redoStack.length) return;
+    const e = redoStack.pop();
+    applyEntry(e, e.after);
+    undoStack.push(e);
+    updateHistoryButtons();
+  }
+  function updateHistoryButtons() {
+    $('#undo').disabled = !undoStack.length;
+    $('#redo').disabled = !redoStack.length;
+  }
+
+  // ---------- Ввод ----------
+  function point(e) {
+    const r = overlay.getBoundingClientRect();
+    return {
+      x: (e.clientX - r.left) * SCALE,
+      y: (e.clientY - r.top) * SCALE,
+      pressure: e.pointerType === 'pen' ? (e.pressure || 0.5) : 1,
+    };
+  }
+
+  function strokeWidth(d, p) {
+    const base = state.size * SCALE;
+    if (!d.pen) return base;
+    // сглаживание силы нажатия
+    d.sp = d.sp == null ? p.pressure : d.sp * 0.7 + p.pressure * 0.3;
+    return Math.max(SCALE * 0.75, base * (0.15 + 0.85 * d.sp));
+  }
+
+  overlay.addEventListener('pointerdown', (e) => {
+    if (drawing || !e.isPrimary) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    moveRing(e);
+    const p = point(e);
+    if (state.tool === 'fill') { floodFill(p.x, p.y); return; }
+    try { overlay.setPointerCapture(e.pointerId); } catch (_) { /* указатель уже исчез */ }
+    if (state.tool === 'brush' || state.tool === 'eraser') startStroke(e, p);
+    else startShape(e, p);
+  });
+
+  overlay.addEventListener('pointermove', (e) => {
+    moveRing(e);
+    if (!drawing || e.pointerId !== drawing.id) return;
+    const events = (e.getCoalescedEvents && e.getCoalescedEvents()) || [];
+    const list = events.length ? events : [e];
+    if (drawing.kind === 'stroke') {
+      for (const ev of list) extendStroke(point(ev));
+    } else {
+      drawing.end = point(e);
+      drawing.shift = e.shiftKey;
+      renderShape();
+    }
+  });
+
+  const finish = (e) => {
+    if (!drawing || e.pointerId !== drawing.id) return;
+    if (drawing.kind === 'stroke') endStroke(); else endShape();
+    drawing = null;
+    if (pendingResize) { pendingResize = false; ensureSize(); }
+  };
+  overlay.addEventListener('pointerup', finish);
+  overlay.addEventListener('pointercancel', finish);
+  overlay.addEventListener('pointerleave', () => { ring.hidden = true; });
+  overlay.addEventListener('pointerenter', moveRing);
+  stage.addEventListener('contextmenu', (e) => e.preventDefault());
+  // На телефоне страница не листается и не масштабируется при рисовании
+  stage.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+  document.addEventListener('dblclick', (e) => e.preventDefault());
+
+  // ---------- Кисть и ластик ----------
+  function startStroke(e, p) {
+    const eraser = state.tool === 'eraser';
+    drawing = {
+      kind: 'stroke', id: e.pointerId, eraser, pen: e.pointerType === 'pen',
+      alpha: state.opacity, last: p, lastEnd: { x: p.x, y: p.y }, lastW: 0, sp: null,
+      bbox: null, pendingErase: null, raf: 0,
+    };
+    const d = drawing;
+    // Штрих рисуется на верхнем слое непрозрачно; прозрачность применяется один раз в конце
+    overlay.style.opacity = eraser ? 0 : state.opacity;
+    octx.clearRect(0, 0, overlay.width, overlay.height);
+    octx.strokeStyle = octx.fillStyle = eraser ? '#000' : state.color;
+    octx.lineCap = 'round';
+    octx.lineJoin = 'round';
+    const w = strokeWidth(d, p);
+    d.lastW = w;
+    octx.beginPath();
+    octx.arc(p.x, p.y, w / 2, 0, Math.PI * 2);
+    octx.fill();
+    touch(d, box(p.x - w / 2 - 2, p.y - w / 2 - 2, p.x + w / 2 + 2, p.y + w / 2 + 2));
+  }
+
+  function extendStroke(p) {
+    const d = drawing;
+    const prev = d.last;
+    if (Math.hypot(p.x - prev.x, p.y - prev.y) < 1) return;
+    const w = strokeWidth(d, p);
+    const mid = { x: (prev.x + p.x) / 2, y: (prev.y + p.y) / 2 };
+    // Квадратичная кривая через середины соседних точек — без «лесенки»
+    octx.lineWidth = (w + d.lastW) / 2;
+    octx.beginPath();
+    octx.moveTo(d.lastEnd.x, d.lastEnd.y);
+    octx.quadraticCurveTo(prev.x, prev.y, mid.x, mid.y);
+    octx.stroke();
+    const pad = Math.max(w, d.lastW) / 2 + 2;
+    touch(d, box(
+      Math.min(d.lastEnd.x, prev.x, mid.x) - pad, Math.min(d.lastEnd.y, prev.y, mid.y) - pad,
+      Math.max(d.lastEnd.x, prev.x, mid.x) + pad, Math.max(d.lastEnd.y, prev.y, mid.y) + pad));
+    d.lastEnd = mid;
+    d.last = p;
+    d.lastW = w;
+  }
+
+  function touch(d, b) {
+    d.bbox = union(d.bbox, b);
+    if (!d.eraser) return;
+    d.pendingErase = union(d.pendingErase, b);
+    if (!d.raf) d.raf = requestAnimationFrame(() => {
+      d.raf = 0;
+      const r = toRect(d.pendingErase);
+      d.pendingErase = null;
+      if (r && drawing === d) composeEraser(r, d.alpha);
+    });
+  }
+
+  // Предпросмотр и итог ластика: копия «до» минус маска штриха
+  function composeEraser(r, alpha) {
+    mctx.clearRect(r.x, r.y, r.w, r.h);
+    mctx.drawImage(snap, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
+    mctx.globalCompositeOperation = 'destination-out';
+    mctx.globalAlpha = alpha;
+    mctx.drawImage(overlay, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
+    mctx.globalCompositeOperation = 'source-over';
+    mctx.globalAlpha = 1;
+  }
+
+  function endStroke() {
+    const d = drawing;
+    if (d.last.x !== d.lastEnd.x || d.last.y !== d.lastEnd.y) {
+      octx.lineWidth = d.lastW;
+      octx.beginPath();
+      octx.moveTo(d.lastEnd.x, d.lastEnd.y);
+      octx.lineTo(d.last.x, d.last.y);
+      octx.stroke();
+    }
+    if (d.raf) cancelAnimationFrame(d.raf);
+    commitOverlay(d.bbox, d.alpha, d.eraser);
+  }
+
+  function commitOverlay(b, alpha, eraser) {
+    const r = toRect(b);
+    if (r) {
+      if (eraser) composeEraser(r, alpha);
+      else {
+        mctx.globalAlpha = alpha;
+        mctx.drawImage(overlay, r.x, r.y, r.w, r.h, r.x, r.y, r.w, r.h);
+        mctx.globalAlpha = 1;
+      }
+    }
+    octx.clearRect(0, 0, overlay.width, overlay.height);
+    overlay.style.opacity = 1;
+    if (r) record(r);
+  }
+
+  // ---------- Фигуры ----------
+  function startShape(e, p) {
+    drawing = {
+      kind: 'shape', id: e.pointerId, tool: state.tool, alpha: state.opacity,
+      start: p, end: p, shift: e.shiftKey, lw: state.size * SCALE, bbox: null, moved: false,
+    };
+    overlay.style.opacity = state.opacity;
+  }
+
+  function shapeGeometry(d) {
+    const { x: x0, y: y0 } = d.start;
+    let dx = d.end.x - x0, dy = d.end.y - y0;
+    if (d.shift) {
+      if (d.tool === 'line') {
+        const step = Math.PI / 4;
+        const a = Math.round(Math.atan2(dy, dx) / step) * step;
+        const len = Math.hypot(dx, dy);
+        dx = Math.cos(a) * len; dy = Math.sin(a) * len;
+      } else {
+        const s = Math.max(Math.abs(dx), Math.abs(dy));
+        dx = (dx < 0 ? -1 : 1) * s; dy = (dy < 0 ? -1 : 1) * s;
+      }
+    }
+    return { x0, y0, x1: x0 + dx, y1: y0 + dy };
+  }
+
+  function renderShape() {
+    const d = drawing;
+    const g = shapeGeometry(d);
+    octx.clearRect(0, 0, overlay.width, overlay.height);
+    if (Math.hypot(g.x1 - g.x0, g.y1 - g.y0) < 1) { d.moved = false; return; }
+    d.moved = true;
+    octx.strokeStyle = state.color;
+    octx.lineWidth = d.lw;
+    octx.lineCap = 'round';
+    octx.lineJoin = 'round';
+    octx.beginPath();
+    const left = Math.min(g.x0, g.x1), top = Math.min(g.y0, g.y1);
+    const w = Math.abs(g.x1 - g.x0), h = Math.abs(g.y1 - g.y0);
+    if (d.tool === 'line') {
+      octx.moveTo(g.x0, g.y0);
+      octx.lineTo(g.x1, g.y1);
+    } else if (d.tool === 'rect') {
+      octx.rect(left, top, w, h);
+    } else {
+      octx.ellipse(left + w / 2, top + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+    }
+    octx.stroke();
+    const pad = d.lw / 2 + 2;
+    d.bbox = box(left - pad, top - pad, left + w + pad, top + h + pad);
+  }
+
+  function endShape() {
+    const d = drawing;
+    if (!d.moved) {
+      octx.clearRect(0, 0, overlay.width, overlay.height);
+      overlay.style.opacity = 1;
+      return;
+    }
+    commitOverlay(d.bbox, d.alpha, false);
+  }
+
+  // ---------- Заливка (scanline) ----------
+  function floodFill(fx, fy) {
+    const sx = Math.floor(fx), sy = Math.floor(fy);
+    const W = main.width, H = main.height;
+    if (sx < 0 || sy < 0 || sx >= W || sy >= H) return;
+    const data = mctx.getImageData(0, 0, W, H).data;
+    // Сравниваем цвета с учётом альфы (премультиплицированно), чтобы прозрачные пиксели были «одного цвета»
+    const si = (sy * W + sx) * 4;
+    const ta = data[si + 3];
+    const tr = data[si] * ta / 255, tg = data[si + 1] * ta / 255, tb = data[si + 2] * ta / 255;
+    const tol = FILL_TOLERANCE;
+    const match = (idx) => {
+      const i = idx * 4, a = data[i + 3];
+      return Math.abs(a - ta) <= tol &&
+        Math.abs(data[i] * a / 255 - tr) <= tol &&
+        Math.abs(data[i + 1] * a / 255 - tg) <= tol &&
+        Math.abs(data[i + 2] * a / 255 - tb) <= tol;
+    };
+
+    const mask = new Uint8Array(W * H);
+    let minX = sx, maxX = sx, minY = sy, maxY = sy;
+    const stack = [sx, sy];
+    while (stack.length) {
+      const y = stack.pop(), x = stack.pop();
+      const row = y * W;
+      let lx = x;
+      while (lx >= 0 && !mask[row + lx] && match(row + lx)) lx--;
+      lx++;
+      let rx = x;
+      while (rx < W && !mask[row + rx] && match(row + rx)) rx++;
+      rx--;
+      if (lx > rx) continue;
+      for (let i = lx; i <= rx; i++) mask[row + i] = 1;
+      if (lx < minX) minX = lx;
+      if (rx > maxX) maxX = rx;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+      for (const ny of [y - 1, y + 1]) {
+        if (ny < 0 || ny >= H) continue;
+        const nrow = ny * W;
+        let inSpan = false;
+        for (let i = lx; i <= rx; i++) {
+          const ok = !mask[nrow + i] && match(nrow + i);
+          if (ok && !inSpan) { stack.push(i, ny); inSpan = true; }
+          else if (!ok) inSpan = false;
+        }
+      }
+    }
+
+    // Расширяем область на 1 px, чтобы у сглаженных краёв не оставалось светлой каймы
+    const bx = Math.max(0, minX - 1), by = Math.max(0, minY - 1);
+    const bw = Math.min(W - 1, maxX + 1) - bx + 1, bh = Math.min(H - 1, maxY + 1) - by + 1;
+    const img = new ImageData(bw, bh);
+    const out = img.data;
+    const [cr, cg, cb] = hexToRgb(state.color);
+    for (let y = 0; y < bh; y++) {
+      const gy = by + y;
+      for (let x = 0; x < bw; x++) {
+        const gx = bx + x;
+        let on = mask[gy * W + gx];
+        if (!on) {
+          for (let oy = -1; oy <= 1 && !on; oy++) {
+            const ny = gy + oy;
+            if (ny < 0 || ny >= H) continue;
+            for (let ox = -1; ox <= 1; ox++) {
+              const nx = gx + ox;
+              if (nx >= 0 && nx < W && mask[ny * W + nx]) { on = 1; break; }
+            }
+          }
+        }
+        if (on) {
+          const o = (y * bw + x) * 4;
+          out[o] = cr; out[o + 1] = cg; out[o + 2] = cb; out[o + 3] = 255;
+        }
+      }
+    }
+    const tmp = document.createElement('canvas');
+    tmp.width = bw; tmp.height = bh;
+    tmp.getContext('2d').putImageData(img, 0, 0);
+    mctx.globalAlpha = state.opacity;
+    mctx.drawImage(tmp, bx, by);
+    mctx.globalAlpha = 1;
+    record({ x: bx, y: by, w: bw, h: bh });
+  }
+
+  // ---------- Очистка ----------
+  function isCanvasEmpty() {
+    const d = mctx.getImageData(0, 0, main.width, main.height).data;
+    for (let i = 3; i < d.length; i += 4) if (d[i]) return false;
+    return true;
+  }
+  function clearCanvas() {
+    if (drawing || isCanvasEmpty()) return;
+    mctx.clearRect(0, 0, main.width, main.height);
+    record({ x: 0, y: 0, w: main.width, h: main.height });
+    toast('Холст очищен');
+  }
+  const confirmEl = $('#confirm');
+  function askClear() {
+    if (drawing) return;
+    confirmEl.hidden = false;
+    $('#confirmYes').focus();
+  }
+  function closeConfirm(ok) {
+    confirmEl.hidden = true;
+    if (ok) clearCanvas();
+  }
+  $('#confirmYes').addEventListener('click', () => closeConfirm(true));
+  $('#confirmNo').addEventListener('click', () => closeConfirm(false));
+  confirmEl.addEventListener('pointerdown', (e) => { if (e.target === confirmEl) closeConfirm(false); });
+
+  // ---------- Экспорт PNG ----------
+  function savePNG() {
+    if (drawing) return;
+    const w = Math.min(main.width, Math.round(stage.clientWidth * SCALE));
+    const h = Math.min(main.height, Math.round(stage.clientHeight * SCALE));
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const x = c.getContext('2d');
+    x.fillStyle = BACKGROUNDS[state.bg];
+    x.fillRect(0, 0, w, h);
+    x.drawImage(main, 0, 0, w, h, 0, 0, w, h);
+    const now = new Date();
+    const p2 = (n) => String(n).padStart(2, '0');
+    const name = `holst-${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())}-${p2(now.getHours())}${p2(now.getMinutes())}.png`;
+    c.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      toast('Сохранено: ' + name);
+    }, 'image/png');
+  }
+
+  let toastTimer = 0;
+  function toast(text) {
+    const t = $('#toast');
+    t.textContent = text;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+  }
+
+  // ---------- Интерфейс ----------
+  function hexToRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function luminance(hex) {
+    const [r, g, b] = hexToRgb(hex);
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  }
+
+  const palette = $('#palette');
+  for (const [name, hex] of PALETTE) {
+    const b = document.createElement('button');
+    b.className = 'sw';
+    b.style.background = hex;
+    b.title = name;
+    b.setAttribute('aria-label', name);
+    b.dataset.color = hex;
+    b.addEventListener('click', () => setColor(hex));
+    palette.appendChild(b);
+  }
+  const customInput = $('#customColor');
+  customInput.addEventListener('input', () => setColor(customInput.value, true));
+
+  function setColor(hex, fromCustom = false) {
+    state.color = hex.toLowerCase();
+    let inPalette = false;
+    for (const sw of palette.children) {
+      const on = !fromCustom && sw.dataset.color === state.color;
+      sw.classList.toggle('active', on);
+      if (on) inPalette = true;
+    }
+    const custom = $('#custom');
+    custom.classList.toggle('active', !inPalette);
+    if (!inPalette) {
+      $('#customSw').style.background = state.color;
+      customInput.value = state.color;
+    }
+    if (state.tool === 'eraser' || state.tool === 'fill') {
+      // выбор цвета возвращает к рисованию, если стоял ластик
+      if (state.tool === 'eraser') setTool('brush');
+    }
+    updatePreview();
+  }
+
+  function setTool(tool) {
+    state.tool = tool;
+    for (const b of document.querySelectorAll('.tool')) b.classList.toggle('active', b.dataset.tool === tool);
+    overlay.classList.toggle('fill-cursor', tool === 'fill');
+    if (tool === 'fill') ring.hidden = true;
+    updateRingSize();
+  }
+  for (const b of document.querySelectorAll('.tool')) b.addEventListener('click', () => setTool(b.dataset.tool));
+
+  const sizeInput = $('#size');
+  const opacityInput = $('#opacity');
+  function setSize(v) {
+    state.size = Math.max(1, Math.min(50, Math.round(v)));
+    sizeInput.value = state.size;
+    $('#sizeVal').textContent = state.size + ' px';
+    updatePreview();
+    updateRingSize();
+  }
+  function setOpacity(v) {
+    state.opacity = Math.max(10, Math.min(100, v)) / 100;
+    $('#opacityVal').textContent = Math.round(state.opacity * 100) + '%';
+    updatePreview();
+  }
+  sizeInput.addEventListener('input', () => setSize(+sizeInput.value));
+  opacityInput.addEventListener('input', () => setOpacity(+opacityInput.value));
+
+  function updatePreview() {
+    const dot = $('#previewDot');
+    const box = dot.parentElement.clientWidth - 6;
+    const s = Math.min(state.size, box || state.size);
+    dot.style.width = dot.style.height = s + 'px';
+    dot.style.background = state.color;
+    dot.style.opacity = state.opacity;
+    dot.style.boxShadow = luminance(state.color) > 0.9 ? 'inset 0 0 0 1px rgba(0,0,0,.25)' : 'none';
+  }
+
+  function setBackground(bg) {
+    const prev = state.bg;
+    state.bg = bg;
+    stage.style.backgroundColor = BACKGROUNDS[bg];
+    for (const b of document.querySelectorAll('.bg')) b.classList.toggle('active', b.dataset.bg === bg);
+    if (prev === bg) return;
+    // Чтобы кисть не потерялась на фоне: тёмная на чёрном → белая, белая на светлом → чернила
+    const lum = luminance(state.color);
+    if (bg === 'black' && lum < 0.2) setColor('#ffffff');
+    else if (bg !== 'black' && lum > 0.92) setColor(INK);
+  }
+  for (const b of document.querySelectorAll('.bg')) b.addEventListener('click', () => setBackground(b.dataset.bg));
+
+  $('#undo').addEventListener('click', undo);
+  $('#redo').addEventListener('click', redo);
+  $('#clear').addEventListener('click', askClear);
+  $('#save').addEventListener('click', savePNG);
+
+  // ---------- Курсор-кружок ----------
+  function updateRingSize() {
+    const s = Math.max(4, state.size);
+    ring.style.width = ring.style.height = s + 'px';
+    ring.dataset.size = s;
+  }
+  function moveRing(e) {
+    if (state.tool === 'fill' || e.pointerType === 'touch') { ring.hidden = true; return; }
+    const r = stage.getBoundingClientRect();
+    const s = +ring.dataset.size || state.size;
+    ring.style.transform = `translate(${e.clientX - r.left - s / 2}px, ${e.clientY - r.top - s / 2}px)`;
+    ring.hidden = false;
+  }
+
+  // ---------- Горячие клавиши (по физическим клавишам — работают в любой раскладке) ----------
+  const TOOL_KEYS = { KeyB: 'brush', KeyE: 'eraser', KeyG: 'fill', KeyL: 'line', KeyR: 'rect', KeyO: 'ellipse' };
+  window.addEventListener('keydown', (e) => {
+    if (!confirmEl.hidden) {
+      if (e.key === 'Escape') { e.preventDefault(); closeConfirm(false); }
+      return;
+    }
+    if (e.key === 'Shift' && drawing && drawing.kind === 'shape') {
+      drawing.shift = true; renderShape(); return;
+    }
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && !e.altKey) {
+      if (e.code === 'KeyZ') { e.preventDefault(); e.shiftKey ? redo() : undo(); }
+      else if (e.code === 'KeyY') { e.preventDefault(); redo(); }
+      else if (e.code === 'KeyS') { e.preventDefault(); savePNG(); }
+      return;
+    }
+    if (e.altKey || mod) return;
+    if (TOOL_KEYS[e.code]) { e.preventDefault(); if (!drawing) setTool(TOOL_KEYS[e.code]); }
+    else if (e.code === 'BracketLeft' || e.code === 'BracketRight') {
+      e.preventDefault();
+      const s = state.size;
+      const step = s < 10 ? 1 : s < 25 ? 2 : 5;
+      setSize(e.code === 'BracketLeft' ? s - step : s + step);
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.key === 'Shift' && drawing && drawing.kind === 'shape') { drawing.shift = false; renderShape(); }
+  });
+
+  // ---------- Старт ----------
+  if (window.ResizeObserver) new ResizeObserver(ensureSize).observe(stage);
+  window.addEventListener('resize', ensureSize);
+  ensureSize();
+  setColor(INK);
+  setSize(6);
+  setOpacity(100);
+  setBackground('white');
+  setTool('brush');
+  updateHistoryButtons();
+})();
+</script>
+</body>
+</html>
